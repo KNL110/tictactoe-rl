@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Tic-Tac-Toe RL</title>
+<link rel="icon" href="data:,">
 <style>
   :root { color-scheme: light dark; }
   body {
@@ -84,6 +85,7 @@
   <div id="tally"></div>
   <div id="statesLearned"></div>
 
+<!-- static-build: scripts -->
 <script>
 const boardEl = document.getElementById('board');
 const statusEl = document.getElementById('status');
@@ -109,6 +111,15 @@ try {
 }
 
 async function api(path, body) {
+  if (window.localApiReady) {  // GitHub Pages build: the Python runs in this browser
+    try {
+      await window.localApiReady;
+      return await window.localApi(path, body);
+    } catch (e) {
+      console.error(e);
+      return {error: 'Something went wrong. Reload the page.'};
+    }
+  }
   try {
     const res = await fetch(path, {
       method: 'POST',

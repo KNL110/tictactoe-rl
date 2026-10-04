@@ -1,14 +1,3 @@
----
-title: Tic-Tac-Toe RL
-emoji: ⭕
-colorFrom: blue
-colorTo: red
-sdk: docker
-app_port: 7860
-pinned: false
-short_description: Play tabular RL agents that learned Tic-Tac-Toe by self-play
----
-
 # Tic-Tac-Toe RL
 
 Two tabular reinforcement learning agents that learn to play Tic-Tac-Toe perfectly
@@ -143,19 +132,22 @@ interfere with each other, and learning from web games stays in memory: it never
 changes `saved_models/`. The exception is `serve.sh`, which sets `TTT_PERSIST=1`
 so *your own* games keep training the saved models, like `train_vs_human.py`.
 
-## Deploying to Hugging Face Spaces
+## Deploying to GitHub Pages (free, no server)
 
-The repo is a ready-made Docker Space: `Dockerfile` builds the image, and the
-front matter at the top of this README configures the Space.
+`build_static.py` builds a static version of the web app into `site/`: the same
+page and the same Python game code (`webapp/api.py`, `webapp/game.py`,
+`tictactoe/`), run in the visitor's browser by [Pyodide](https://pyodide.org).
+Each visitor gets a private game automatically, and nothing they do touches the repo.
 
 ```bash
-pip install -r requirements-dev.txt     # includes the hf CLI
-hf auth login                           # paste a token with "write" access
-./deploy_hf.sh <hf-username>/tictactoe-rl
+python build_static.py && python -m http.server -d site   # preview at http://localhost:8000
 ```
 
-Rerun `./deploy_hf.sh` to redeploy after changes. The Space sleeps after a while
-without visitors and wakes up (in ~30s) on the next visit.
+`.github/workflows/pages.yml` rebuilds and publishes it on every push to `main`.
+One-time setup: in the repo's **Settings → Pages**, set **Source** to **GitHub Actions**.
+
+The Flask app and `Dockerfile` still work for hosting on a server (e.g. Render),
+which the image supports by listening on `$PORT`.
 
 ## Files
 
@@ -172,9 +164,12 @@ without visitors and wakes up (in ~30s) on the next visit.
 | `train.py` | CLI: train both agents from scratch, save models and plot |
 | `play.py` | CLI: play a fixed (non-learning) trained agent |
 | `train_vs_human.py` | CLI: play the agent while it keeps learning from your games |
-| `webapp/` | Flask web app (`app.py` routes, `game.py` per-visitor game, `sessions.py` store) |
+| `webapp/` | Web app (`app.py` Flask routes, `game.py` per-visitor game, `sessions.py` store) |
 | `serve.sh` | Run the web app locally with a temporary public tunnel |
-| `Dockerfile`, `deploy_hf.sh` | Hugging Face Space image and upload script |
+| `webapp/api.py` | The JSON API as plain functions, shared by Flask and the static build |
+| `build_static.py`, `static/` | Static GitHub Pages build (Pyodide) |
+| `.github/workflows/pages.yml` | Publishes the static build to GitHub Pages |
+| `Dockerfile` | Container image for server hosting |
 
 ## Suggested next steps
 

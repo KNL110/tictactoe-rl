@@ -21,3 +21,6 @@ env/
 
 # Note: saved_models/*.pkl and plots/*.png ARE committed on purpose: the web app
 # serves the pretrained models, and the README shows the training plot.
+
+# Static GitHub Pages build output (python build_static.py)
+site/
