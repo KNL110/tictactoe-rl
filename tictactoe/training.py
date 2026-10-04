@@ -10,6 +10,8 @@ and a perfect minimax opponent so you can watch them approach optimal play:
   - vs minimax: loss rate should fall to 0% (a perfect agent can never be beaten,
     but a perfect Tic-Tac-Toe player still only draws minimax, never wins)
 """
+import random
+
 from tictactoe.agents.minimax import MinimaxAgent
 from tictactoe.agents.random_agent import RandomAgent
 from tictactoe.env import TicTacToeEnv, available_actions
@@ -27,7 +29,17 @@ def alpha_schedule(episode, total_episodes, start=0.3, end=0.02):
     return start + frac * (end - start)
 
 
-def play_q_learning_episode(env, agent):
+def random_opening(env, n_moves):
+    """Exploring start: play `n_moves` uniformly random moves (not learned from).
+    Returns True if that already ended the game."""
+    for _ in range(n_moves):
+        _, _, done = env.step(random.choice(available_actions(env.board)))
+        if done:
+            return True
+    return False
+
+
+def play_q_learning_episode(env, agent, opening_moves=0):
     """One self-play episode with a negamax-style Q-learning update.
 
     Q(s, a) is the value of action a to whoever is about to move. After a
@@ -38,8 +50,12 @@ def play_q_learning_episode(env, agent):
     This mirrors the 1-V(next) trick in the TD value agent and converges far
     more cleanly than the two-ply version (which doubles the max-bootstrap
     bias and was noisier in practice).
+
+    `opening_moves` starts the episode from a random position (see random_opening).
     """
     env.reset()
+    if random_opening(env, opening_moves):
+        return
     while True:
         mover = env.player
         board = env.board
@@ -61,10 +77,12 @@ def play_q_learning_episode(env, agent):
             agent.update(state, action, target)
 
 
-def play_td_episode(env, agent):
+def play_td_episode(env, agent, opening_moves=0):
     """One self-play episode with single-ply TD(0) updates via the 1-V(next) trick
     (see the docstring in agents/td_value.py for why this is valid)."""
     env.reset()
+    if random_opening(env, opening_moves):
+        return
     prev_state = None
 
     while True:
@@ -145,13 +163,11 @@ def evaluate(agent, opponent, n_games=200):
     return {k: v / total for k, v in results.items()}
 
 
+SELF_PLAY_EPISODES = {"q": play_q_learning_episode, "td": play_td_episode}
+
+
 def train(agent_kind, episodes, eval_every, eval_games):
-    if agent_kind == "q":
-        play_episode = play_q_learning_episode
-    elif agent_kind == "td":
-        play_episode = play_td_episode
-    else:
-        raise ValueError(agent_kind)
+    play_episode = SELF_PLAY_EPISODES[agent_kind]
     agent = new_agent(agent_kind)
 
     random_opponent = RandomAgent()
@@ -176,3 +192,23 @@ def train(agent_kind, episodes, eval_every, eval_games):
             )
 
     return agent, history
+
+
+def finetune(agent_kind, agent, episodes, max_opening_moves=6):
+    """Keep training an already-trained agent from random starting positions.
+
+    Plain self-play converges on its own favorite lines, so positions that only
+    arise after an odd opening (like an edge first move) can stay barely visited,
+    and an unvisited position looks like a draw thanks to the optimistic 0.5
+    default. Random openings force those positions to be played out; exploration
+    and learning rate anneal to zero again so the fixes settle instead of being
+    shaken loose by noise.
+    """
+    play_episode = SELF_PLAY_EPISODES[agent_kind]
+    env = TicTacToeEnv()
+    for ep in range(1, episodes + 1):
+        agent.epsilon = epsilon_schedule(ep, episodes, start=0.3)
+        agent.alpha = alpha_schedule(ep, episodes, start=0.2, end=0.01)
+        play_episode(env, agent, opening_moves=random.randint(0, max_opening_moves))
+    agent.epsilon = 0.0
+    return agent

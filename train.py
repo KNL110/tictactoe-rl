@@ -5,6 +5,7 @@ import argparse
 from tictactoe.models import ROOT, save_agent
 from tictactoe.plotting import plot_history
 from tictactoe.training import train
+from tictactoe.verify import report
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -22,3 +23,7 @@ if __name__ == "__main__":
     print("Saved trained agents to saved_models/")
 
     plot_history(histories, ROOT / "plots" / "training_curves.png")
+
+    print("\nExhaustive check (every possible opponent move):")
+    if report(q_agent, "Q-learning") + report(td_agent, "TD value"):
+        print("Some lines still beat an agent; patch them with `python finetune.py --agent <q|td>`.")

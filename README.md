@@ -76,7 +76,28 @@ python play.py --agent td --first agent
 
 # Play against the agent while it learns live from your games (see below)
 python train_vs_human.py --agent q
+
+# Check every possible game: can ANY opponent beat the saved agents?
+python -m tictactoe.verify
+
+# Patch any weak spot found: fine-tune from random openings, re-check, save if fixed
+python finetune.py --agent q
 ```
+
+## Finding and fixing weak spots
+
+Never losing to minimax doesn't prove an agent is unbeatable: minimax is one
+opponent with one (perfect) style, so it never steers into odd positions.
+`tictactoe/verify.py` instead walks the whole game tree — every possible opponent
+move, and every move the agent might pick when it breaks a tie at random.
+
+That check found a real hole in the original Q-learning model: open on the right
+edge (5), and if it answered 3 then 0 → 1, the fork at 8 won. Self-play rarely
+opens on an edge, so those positions were barely visited, and an unvisited position
+looks like a draw thanks to the optimistic 0.5 default. `finetune.py` fixes this
+the RL way: it keeps training from random openings (exploring starts) with
+exploration and learning rate annealed back to zero, and only saves the model
+once the exhaustive check finds no losing line.
 
 ## Playing against a self-play agent always draws — is that a bug?
 
@@ -157,11 +178,13 @@ which the image supports by listening on `$PORT`.
 | `tictactoe/utils.py` | State canonicalization, pickle helpers |
 | `tictactoe/agents/` | Q-learning, TD(0) value, random, and minimax (evaluation-only) agents |
 | `tictactoe/models.py` | Saved-model paths; loading/saving agents |
-| `tictactoe/training.py` | Self-play episodes, training loop, evaluation, episodes vs a human |
+| `tictactoe/training.py` | Self-play episodes, training loop, fine-tuning, evaluation, episodes vs a human |
 | `tictactoe/learning.py` | Per-move learning updates against a human (CLI and web app) |
+| `tictactoe/verify.py` | Exhaustive check: every game any opponent could play |
 | `tictactoe/plotting.py` | Training curves |
 | `tictactoe/console.py` | Terminal board rendering and move input |
 | `train.py` | CLI: train both agents from scratch, save models and plot |
+| `finetune.py` | CLI: patch weak spots in a saved agent, verified exhaustively |
 | `play.py` | CLI: play a fixed (non-learning) trained agent |
 | `train_vs_human.py` | CLI: play the agent while it keeps learning from your games |
 | `webapp/` | Web app (`app.py` Flask routes, `game.py` per-visitor game, `sessions.py` store) |
