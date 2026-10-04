@@ -2,19 +2,20 @@
 curves. The training logic itself lives in tictactoe/training.py."""
 import argparse
 
-from tictactoe.models import ROOT, save_agent
+from tictactoe.models import ROOT, AgentKind, save_agent
 from tictactoe.plotting import plot_history
-from tictactoe.training import train
+from tictactoe.training import History, train
 from tictactoe.verify import report
 
-if __name__ == "__main__":
+
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--episodes", type=int, default=1_000_000)
     parser.add_argument("--eval-every", type=int, default=25_000)
     parser.add_argument("--eval-games", type=int, default=300)
     args = parser.parse_args()
 
-    histories = {}
+    histories: dict[AgentKind, History] = {}
     q_agent, histories["q"] = train("q", args.episodes, args.eval_every, args.eval_games)
     td_agent, histories["td"] = train("td", args.episodes, args.eval_every, args.eval_games)
 
@@ -26,4 +27,8 @@ if __name__ == "__main__":
 
     print("\nExhaustive check (every possible opponent move):")
     if report(q_agent, "Q-learning") + report(td_agent, "TD value"):
-        print("Some lines still beat an agent; patch them with `python finetune.py --agent <q|td>`.")
+        print("Some lines still beat an agent; patch them with `uv run finetune.py --agent <q|td>`.")
+
+
+if __name__ == "__main__":
+    main()

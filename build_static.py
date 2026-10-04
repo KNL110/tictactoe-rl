@@ -15,10 +15,16 @@ PYODIDE_URL = "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/pyodide.js"
 PLACEHOLDER = "<!-- static-build: scripts -->"
 
 # Everything the browser needs to import webapp.api and webapp.game (no Flask).
-PY_SOURCES = ["tictactoe/**/*.py", "webapp/__init__.py", "webapp/api.py", "webapp/game.py", "saved_models/*.pkl"]
+PY_SOURCES: list[str] = [
+    "tictactoe/**/*.py",
+    "webapp/__init__.py",
+    "webapp/api.py",
+    "webapp/game.py",
+    "saved_models/*.pkl",
+]
 
 
-def main():
+def main() -> None:
     shutil.rmtree(SITE, ignore_errors=True)
     SITE.mkdir()
 

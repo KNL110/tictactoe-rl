@@ -1,18 +1,18 @@
 """Terminal board rendering and move input, shared by play.py and train_vs_human.py."""
-from tictactoe.env import available_actions
+from tictactoe.env import Action, Board, available_actions
 
 CELL = {1: "X", -1: "O", 0: " "}
 
 
-def render(board):
-    def cell(i):
+def render(board: Board) -> None:
+    def cell(i: int) -> str:
         return CELL[board[i]] if board[i] != 0 else str(i)
 
     rows = [" | ".join(cell(r * 3 + c) for c in range(3)) for r in range(3)]
     print(("\n" + "-" * 11 + "\n").join(rows))
 
 
-def human_move(board):
+def human_move(board: Board) -> Action:
     actions = available_actions(board)
     while True:
         raw = input(f"Your move {actions}: ").strip()

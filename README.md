@@ -107,6 +107,13 @@ Requires [uv](https://docs.astral.sh/uv/).
 uv sync
 ```
 
+The code is fully type-annotated and checked with strict mypy; ruff handles linting:
+
+```bash
+uv run ruff check .
+uv run mypy .
+```
+
 ## Usage
 
 ```bash

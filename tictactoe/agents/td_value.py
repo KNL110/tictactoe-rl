@@ -1,7 +1,14 @@
 import random
 from collections import defaultdict
 
+from tictactoe.env import Action, Board, Player, apply_move
 from tictactoe.utils import canonical_state
+
+type VTable = dict[Board, float]
+
+
+def default_value() -> float:
+    return 0.5  # unknown states assumed a coin flip
 
 
 class TDValueAgent:
@@ -18,20 +25,15 @@ class TDValueAgent:
     target lets one table learn from both sides of the game.
     """
 
-    def __init__(self, alpha=0.3, epsilon=0.2):
+    def __init__(self, alpha: float = 0.3, epsilon: float = 0.2) -> None:
         self.alpha = alpha
         self.epsilon = epsilon
-        self.V = defaultdict(lambda: 0.5)  # unknown states assumed a coin flip
+        self.V: defaultdict[Board, float] = defaultdict(default_value)
 
-    def _afterstates(self, board, player, actions):
-        results = {}
-        for a in actions:
-            next_board = list(board)
-            next_board[a] = player
-            results[a] = canonical_state(tuple(next_board), player)
-        return results
+    def _afterstates(self, board: Board, player: Player, actions: list[Action]) -> dict[Action, Board]:
+        return {a: canonical_state(apply_move(board, a, player), player) for a in actions}
 
-    def choose_action(self, board, player, actions, greedy=False):
+    def choose_action(self, board: Board, player: Player, actions: list[Action], greedy: bool = False) -> Action:
         afterstates = self._afterstates(board, player, actions)
         if not greedy and random.random() < self.epsilon:
             return random.choice(actions)
@@ -39,5 +41,5 @@ class TDValueAgent:
         best_actions = [a for a, s in afterstates.items() if self.V[s] == best_v]
         return random.choice(best_actions)
 
-    def update(self, state, target):
+    def update(self, state: Board, target: float) -> None:
         self.V[state] += self.alpha * (target - self.V[state])

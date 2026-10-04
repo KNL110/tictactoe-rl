@@ -11,25 +11,41 @@ and a perfect minimax opponent so you can watch them approach optimal play:
     but a perfect Tic-Tac-Toe player still only draws minimax, never wins)
 """
 import random
+from collections.abc import Callable
+from typing import TypedDict
 
+from tictactoe.agents import Agent
 from tictactoe.agents.minimax import MinimaxAgent
+from tictactoe.agents.q_learning import QLearningAgent
 from tictactoe.agents.random_agent import RandomAgent
-from tictactoe.env import TicTacToeEnv, available_actions
-from tictactoe.models import new_agent
+from tictactoe.agents.td_value import TDValueAgent
+from tictactoe.env import Action, Board, Player, TicTacToeEnv, available_actions
+from tictactoe.learning import OnlineLearner
+from tictactoe.models import AgentKind, LearningAgent, new_agent
 from tictactoe.utils import canonical_state
 
+type EvalResult = dict[str, float]  # "win" / "draw" / "loss" -> rate
+type HumanMoveFn = Callable[[Board, list[Action]], Action]
+type MoveCallback = Callable[[Player, Action, Board, Player, bool], None]
 
-def epsilon_schedule(episode, total_episodes, start=0.5, end=0.0):
+
+class History(TypedDict):
+    episode: list[int]
+    vs_random: list[EvalResult]
+    vs_minimax: list[EvalResult]
+
+
+def epsilon_schedule(episode: int, total_episodes: int, start: float = 0.5, end: float = 0.0) -> float:
     frac = min(episode / (0.9 * total_episodes), 1.0)
     return start + frac * (end - start)
 
 
-def alpha_schedule(episode, total_episodes, start=0.3, end=0.02):
+def alpha_schedule(episode: int, total_episodes: int, start: float = 0.3, end: float = 0.02) -> float:
     frac = min(episode / total_episodes, 1.0)
     return start + frac * (end - start)
 
 
-def random_opening(env, n_moves):
+def random_opening(env: TicTacToeEnv, n_moves: int) -> bool:
     """Exploring start: play `n_moves` uniformly random moves (not learned from).
     Returns True if that already ended the game."""
     for _ in range(n_moves):
@@ -39,7 +55,7 @@ def random_opening(env, n_moves):
     return False
 
 
-def play_q_learning_episode(env, agent, opening_moves=0):
+def play_q_learning_episode(env: TicTacToeEnv, agent: QLearningAgent, opening_moves: int = 0) -> None:
     """One self-play episode with a negamax-style Q-learning update.
 
     Q(s, a) is the value of action a to whoever is about to move. After a
@@ -77,13 +93,13 @@ def play_q_learning_episode(env, agent, opening_moves=0):
             agent.update(state, action, target)
 
 
-def play_td_episode(env, agent, opening_moves=0):
+def play_td_episode(env: TicTacToeEnv, agent: TDValueAgent, opening_moves: int = 0) -> None:
     """One self-play episode with single-ply TD(0) updates via the 1-V(next) trick
     (see the docstring in agents/td_value.py for why this is valid)."""
     env.reset()
     if random_opening(env, opening_moves):
         return
-    prev_state = None
+    prev_state: Board | None = None
 
     while True:
         mover = env.player
@@ -105,9 +121,23 @@ def play_td_episode(env, agent, opening_moves=0):
             prev_state = state
 
 
-def play_episode_vs_human(env, learner, agent_side, human_move_fn, on_move=None):
+def play_self_play_episode(env: TicTacToeEnv, agent: LearningAgent, opening_moves: int = 0) -> None:
+    if isinstance(agent, QLearningAgent):
+        play_q_learning_episode(env, agent, opening_moves)
+    else:
+        play_td_episode(env, agent, opening_moves)
+
+
+def play_episode_vs_human(
+    env: TicTacToeEnv,
+    learner: OnlineLearner,
+    agent_side: Player,
+    human_move_fn: HumanMoveFn,
+    on_move: MoveCallback | None = None,
+) -> Player:
     """Like the self-play episodes, but one side's actions come from `human_move_fn`,
-    and only the agent's moves are learned from (see tictactoe/learning.py)."""
+    and only the agent's moves are learned from (see tictactoe/learning.py).
+    Returns the winner (0 for a draw)."""
     env.reset()
     agent = learner.agent
 
@@ -134,7 +164,7 @@ def play_episode_vs_human(env, learner, agent_side, human_move_fn, on_move=None)
             return winner
 
 
-def evaluate(agent, opponent, n_games=200):
+def evaluate(agent: Agent, opponent: Agent, n_games: int = 200) -> EvalResult:
     """Greedy (no exploration) evaluation: `agent` plays n_games/2 as X and n_games/2 as O."""
     env = TicTacToeEnv()
     results = {"win": 0, "draw": 0, "loss": 0}
@@ -163,21 +193,16 @@ def evaluate(agent, opponent, n_games=200):
     return {k: v / total for k, v in results.items()}
 
 
-SELF_PLAY_EPISODES = {"q": play_q_learning_episode, "td": play_td_episode}
-
-
-def train(agent_kind, episodes, eval_every, eval_games):
-    play_episode = SELF_PLAY_EPISODES[agent_kind]
+def train(agent_kind: AgentKind, episodes: int, eval_every: int, eval_games: int) -> tuple[LearningAgent, History]:
     agent = new_agent(agent_kind)
-
     random_opponent = RandomAgent()
     minimax_opponent = MinimaxAgent()
-    history = {"episode": [], "vs_random": [], "vs_minimax": []}
+    history: History = {"episode": [], "vs_random": [], "vs_minimax": []}
 
     for ep in range(1, episodes + 1):
         agent.epsilon = epsilon_schedule(ep, episodes)
         agent.alpha = alpha_schedule(ep, episodes)
-        play_episode(TicTacToeEnv(), agent)
+        play_self_play_episode(TicTacToeEnv(), agent)
 
         if ep % eval_every == 0 or ep == episodes:
             vs_random = evaluate(agent, random_opponent, eval_games)
@@ -194,7 +219,7 @@ def train(agent_kind, episodes, eval_every, eval_games):
     return agent, history
 
 
-def finetune(agent_kind, agent, episodes, max_opening_moves=6):
+def finetune(agent: LearningAgent, episodes: int, max_opening_moves: int = 6) -> LearningAgent:
     """Keep training an already-trained agent from random starting positions.
 
     Plain self-play converges on its own favorite lines, so positions that only
@@ -204,11 +229,10 @@ def finetune(agent_kind, agent, episodes, max_opening_moves=6):
     and learning rate anneal to zero again so the fixes settle instead of being
     shaken loose by noise.
     """
-    play_episode = SELF_PLAY_EPISODES[agent_kind]
     env = TicTacToeEnv()
     for ep in range(1, episodes + 1):
         agent.epsilon = epsilon_schedule(ep, episodes, start=0.3)
         agent.alpha = alpha_schedule(ep, episodes, start=0.2, end=0.01)
-        play_episode(env, agent, opening_moves=random.randint(0, max_opening_moves))
+        play_self_play_episode(env, agent, opening_moves=random.randint(0, max_opening_moves))
     agent.epsilon = 0.0
     return agent

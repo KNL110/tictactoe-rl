@@ -4,14 +4,20 @@ Board is a length-9 tuple. Cells hold 1 (player X), -1 (player O), or 0 (empty).
 Players alternate starting with X (1).
 """
 
-WIN_LINES = [
+type Board = tuple[int, ...]
+type Player = int  # 1 (X) or -1 (O)
+type Action = int  # cell index 0-8
+
+WIN_LINES: list[tuple[int, int, int]] = [
     (0, 1, 2), (3, 4, 5), (6, 7, 8),  # rows
     (0, 3, 6), (1, 4, 7), (2, 5, 8),  # cols
     (0, 4, 8), (2, 4, 6),             # diagonals
 ]
 
+EMPTY_BOARD: Board = (0,) * 9
 
-def check_winner(board):
+
+def check_winner(board: Board) -> tuple[Player, bool]:
     """Return 1 if X won, -1 if O won, 0 if draw/ongoing, and whether the game is over."""
     for a, b, c in WIN_LINES:
         s = board[a] + board[b] + board[c]
@@ -24,35 +30,40 @@ def check_winner(board):
     return 0, False  # ongoing
 
 
-def available_actions(board):
+def available_actions(board: Board) -> list[Action]:
     return [i for i, v in enumerate(board) if v == 0]
 
 
-class TicTacToeEnv:
-    def __init__(self):
-        self.board = None
-        self.player = None
-        self.reset()
+def apply_move(board: Board, action: Action, player: Player) -> Board:
+    """The board after `player` plays `action` (boards are immutable tuples)."""
+    next_board = list(board)
+    next_board[action] = player
+    return tuple(next_board)
 
-    def reset(self):
-        self.board = (0,) * 9
+
+class TicTacToeEnv:
+    def __init__(self) -> None:
+        self.board: Board = EMPTY_BOARD
+        self.player: Player = 1
+
+    def reset(self) -> Board:
+        self.board = EMPTY_BOARD
         self.player = 1  # X moves first
         return self.board
 
-    def step(self, action):
-        if self.board[action] != 0: # type: ignore
+    def step(self, action: Action) -> tuple[Board, Player, bool]:
+        """Play `action` for the current player. Returns (board, winner, done)."""
+        if self.board[action] != 0:
             raise ValueError(f"Illegal move: cell {action} is occupied")
-        new_board = list(self.board) # type: ignore
-        new_board[action] = self.player # type: ignore
-        self.board = tuple(new_board)
+        self.board = apply_move(self.board, action, self.player)
 
         winner, done = check_winner(self.board)
-        self.player *= -1  # type: ignore # switch turns
+        self.player *= -1  # switch turns
         return self.board, winner, done
 
-    def render(self):
+    def render(self) -> None:
         symbols = {1: "X", -1: "O", 0: "."}
         rows = []
         for r in range(3):
-            rows.append(" ".join(symbols[self.board[r * 3 + c]] for c in range(3))) # type: ignore
+            rows.append(" ".join(symbols[self.board[r * 3 + c]] for c in range(3)))
         print("\n".join(rows))

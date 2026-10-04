@@ -6,18 +6,23 @@ import socket
 from webapp.app import app
 
 
-def local_ip():
+def local_ip() -> str:
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         s.connect(("8.8.8.8", 80))
-        return s.getsockname()[0]
+        address: str = s.getsockname()[0]
+        return address
     except OSError:
         return "127.0.0.1"
     finally:
         s.close()
 
 
-if __name__ == "__main__":
+def main() -> None:
     port = int(os.environ.get("PORT", 5000))
     print(f"\nOpen this on your phone (same wifi as this machine): http://{local_ip()}:{port}\n")
     app.run(host="0.0.0.0", port=port, debug=False)
+
+
+if __name__ == "__main__":
+    main()

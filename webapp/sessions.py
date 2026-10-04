@@ -5,16 +5,17 @@ Idle games expire and the total is capped, so a public URL can't grow memory for
 """
 import time
 from collections import OrderedDict
+from collections.abc import Callable
 
 
-class SessionStore:
-    def __init__(self, factory, max_sessions=200, ttl_seconds=3600):
+class SessionStore[T]:
+    def __init__(self, factory: Callable[[], T], max_sessions: int = 200, ttl_seconds: float = 3600) -> None:
         self._factory = factory
         self.max_sessions = max_sessions
         self.ttl_seconds = ttl_seconds
-        self._items = OrderedDict()  # id -> (last_seen, session), least recently used first
+        self._items: OrderedDict[str, tuple[float, T]] = OrderedDict()  # least recently used first
 
-    def get(self, session_id):
+    def get(self, session_id: str) -> T:
         """The session for `session_id`, created if new or expired."""
         now = time.monotonic()
         while self._items and next(iter(self._items.values()))[0] < now - self.ttl_seconds:
@@ -27,5 +28,5 @@ class SessionStore:
             self._items.popitem(last=False)
         return session
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._items)

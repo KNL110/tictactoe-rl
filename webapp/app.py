@@ -4,7 +4,7 @@ The API logic itself lives in api.py."""
 import re
 import threading
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, Response, jsonify, render_template, request
 
 from webapp import api
 from webapp.game import GameSession
@@ -22,12 +22,12 @@ _lock = threading.Lock()
 
 
 @app.route("/")
-def index():
+def index() -> str:
     return render_template("index.html")
 
 
 @app.route("/api/<name>", methods=["POST"])
-def api_call(name):
+def api_call(name: str) -> tuple[Response, int]:
     path = f"/api/{name}"
     if path not in api.ROUTES:
         return jsonify({"error": "not found"}), 404

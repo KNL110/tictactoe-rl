@@ -11,7 +11,28 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["matplotlib"]
+dev = ["matplotlib", "mypy", "ruff"]
 
 [tool.uv]
 package = false # scripts run from the repo root; nothing to build or install
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+extend-exclude = ["site"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = [
+    "E241",   # aligned columns in env.WIN_LINES
+    "SIM108", # if/else blocks read clearer than long ternaries here
+]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+exclude = ["^site/", "^\\.venv/"]
+
+[[tool.mypy.overrides]]
+module = "matplotlib.*"
+ignore_missing_imports = true
