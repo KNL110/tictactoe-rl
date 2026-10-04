@@ -23,10 +23,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-      - run: python build_static.py
+      - uses: astral-sh/setup-uv@v6
+      - run: uv run --no-sync build_static.py  # stdlib only; no dependencies needed
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site

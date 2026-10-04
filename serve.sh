@@ -8,11 +8,10 @@
 # it's not guessable and dies the moment you Ctrl-C this script.
 set -e
 cd "$(dirname "$0")"
-source .venv/bin/activate
 
-# TTT_PERSIST=1: games you play here keep training the saved models (never set on the
-# public Hugging Face deployment, see webapp/game.py).
-TTT_PERSIST=1 python -m webapp > /tmp/tictactoe_webapp.log 2>&1 &
+# TTT_PERSIST=1: games played here keep training the saved models (never set on a
+# public deployment, see webapp/game.py).
+TTT_PERSIST=1 uv run -m webapp > /tmp/tictactoe_webapp.log 2>&1 &
 WEBAPP_PID=$!
 
 cleanup() {

@@ -1,3 +1,0 @@
-# Local extras: training plots
--r requirements.txt
-matplotlib

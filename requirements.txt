@@ -1,4 +1,0 @@
-# Runtime: what the web app needs (installed in the Docker image)
-flask>=3.0
-numpy>=2.0  # the saved .pkl models contain numpy 2 arrays
-gunicorn>=22.0

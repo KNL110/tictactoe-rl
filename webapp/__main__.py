@@ -1,4 +1,4 @@
-"""Local dev server: `python -m webapp`, then open the printed URL on your phone
+"""Local dev server: `uv run -m webapp`, then open the printed URL on your phone
 (same wifi as this machine). Set PORT to change the port (default 5000)."""
 import os
 import socket

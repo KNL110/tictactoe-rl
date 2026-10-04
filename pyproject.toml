@@ -1,0 +1,17 @@
+[project]
+name = "tictactoe-rl"
+version = "0.1.0"
+description = "Tabular Q-learning and TD(0) agents that learn Tic-Tac-Toe through self-play"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "flask>=3.0",
+    "gunicorn>=22.0",
+    "numpy>=2.0", # the saved .pkl models contain numpy 2 arrays
+]
+
+[dependency-groups]
+dev = ["matplotlib"]
+
+[tool.uv]
+package = false # scripts run from the repo root; nothing to build or install

@@ -4,6 +4,6 @@
   game      one visitor's game: board, agents, per-move learning
   sessions  in-memory store that keeps each visitor's game separate
 
-Run locally with `python -m webapp`, or in production with
+Run locally with `uv run -m webapp`, or in production with
 `gunicorn -w 1 webapp.app:app` (one worker: games live in process memory).
 """

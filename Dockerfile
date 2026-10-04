@@ -1,14 +1,16 @@
 # Production image. Listens on $PORT (set by hosts like Render), defaulting to 7860.
 FROM python:3.13-slim
+COPY --from=ghcr.io/astral-sh/uv:0.12 /uv /bin/uv
 
 RUN useradd -m -u 1000 user
 USER user
-ENV PATH="/home/user/.local/bin:$PATH" \
-    PYTHONUNBUFFERED=1
+ENV PYTHONUNBUFFERED=1 \
+    UV_COMPILE_BYTECODE=1 \
+    UV_PYTHON_DOWNLOADS=never
 WORKDIR /home/user/app
 
-COPY --chown=user requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+COPY --chown=user pyproject.toml uv.lock .python-version ./
+RUN uv sync --frozen --no-dev
 
 COPY --chown=user tictactoe ./tictactoe
 COPY --chown=user webapp ./webapp
@@ -16,4 +18,4 @@ COPY --chown=user saved_models ./saved_models
 
 EXPOSE 7860
 # One worker on purpose: games live in process memory. Threads handle concurrent visitors.
-CMD exec gunicorn --workers 1 --threads 8 --bind "0.0.0.0:${PORT:-7860}" webapp.app:app
+CMD exec .venv/bin/gunicorn --workers 1 --threads 8 --bind "0.0.0.0:${PORT:-7860}" webapp.app:app
