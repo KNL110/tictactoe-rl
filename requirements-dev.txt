@@ -1,0 +1,4 @@
+# Local extras: training plots and deploying to Hugging Face
+-r requirements.txt
+matplotlib
+huggingface_hub

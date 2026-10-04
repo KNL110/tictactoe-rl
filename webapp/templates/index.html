@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Tic-Tac-Toe RL</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font-family: -apple-system, system-ui, sans-serif;
+    max-width: 420px;
+    margin: 0 auto;
+    padding: 16px;
+    text-align: center;
+  }
+  h1 { font-size: 1.3rem; margin: 4px 0 12px; }
+  .controls { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+  .row { display: flex; gap: 10px; justify-content: center; align-items: center; flex-wrap: wrap; }
+  select, button { font-size: 1rem; padding: 8px 12px; border-radius: 8px; border: 1px solid #888; }
+  button.primary { background: #2563eb; color: white; border: none; font-weight: 600; }
+  label { font-size: 0.95rem; display: flex; align-items: center; gap: 6px; }
+  #status { min-height: 1.4em; margin: 10px 0; font-weight: 600; }
+  #board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    max-width: 320px;
+    margin: 0 auto;
+  }
+  .cell {
+    aspect-ratio: 1;
+    font-size: 2.5rem;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #999;
+    border-radius: 10px;
+    background: none;
+  }
+  .cell.x { color: #2563eb; }
+  .cell.o { color: #dc2626; }
+  #tally { margin-top: 16px; font-size: 0.9rem; opacity: 0.75; }
+</style>
+</head>
+<body>
+  <h1>Tic-Tac-Toe RL</h1>
+  <div class="controls">
+    <div class="row">
+      <label>Agent
+        <select id="agentSelect">
+          <option value="q">Q-learning</option>
+          <option value="td">TD value</option>
+        </select>
+      </label>
+      <label>First
+        <select id="firstSelect">
+          <option value="human">You</option>
+          <option value="agent">Agent</option>
+        </select>
+      </label>
+    </div>
+    <div class="row">
+      <label>Start from
+        <select id="startFromSelect">
+          <option value="pretrained">Pretrained (mastered)</option>
+          <option value="fresh">Fresh (blank, train from scratch)</option>
+        </select>
+      </label>
+    </div>
+    <div class="row">
+      <label><input type="checkbox" id="learnCheck" checked> Learn from this game</label>
+      <label>Exploration (&epsilon;)
+        <input type="number" id="epsilonInput" min="0" max="1" step="0.05" value="0" style="width:4.5em">
+      </label>
+    </div>
+    <div class="row" id="resetRow" style="display:none">
+      <button id="resetFreshBtn">Reset fresh agent to blank</button>
+    </div>
+    <button class="primary" id="newGameBtn">New Game</button>
+  </div>
+  <div id="status">Press New Game to start</div>
+  <div id="board"></div>
+  <div id="tally"></div>
+  <div id="statesLearned"></div>
+
+<script>
+const boardEl = document.getElementById('board');
+const statusEl = document.getElementById('status');
+const tallyEl = document.getElementById('tally');
+const statesEl = document.getElementById('statesLearned');
+const startFromSelect = document.getElementById('startFromSelect');
+const epsilonInput = document.getElementById('epsilonInput');
+const resetRow = document.getElementById('resetRow');
+let board = Array(9).fill('');
+
+// Random id for this browser so the server keeps our game separate from everyone
+// else's. crypto.randomUUID needs https, so fall back to getRandomValues on plain-http LAN.
+function makeSessionId() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
+}
+let sessionId;
+try {
+  sessionId = localStorage.getItem('tttSessionId');
+  if (!sessionId) { sessionId = makeSessionId(); localStorage.setItem('tttSessionId', sessionId); }
+} catch (e) {
+  sessionId = makeSessionId();
+}
+
+async function api(path, body) {
+  try {
+    const res = await fetch(path, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Session-Id': sessionId},
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (!res.ok && !data.error) data.error = `Server error (${res.status})`;
+    return data;
+  } catch (e) {
+    return {error: 'Could not reach the server. Try again.'};
+  }
+}
+let gameOver = true;
+
+function isFresh() { return startFromSelect.value === 'fresh'; }
+
+function syncFreshUI() {
+  resetRow.style.display = isFresh() ? 'flex' : 'none';
+  epsilonInput.value = isFresh() ? 0.3 : 0;
+}
+startFromSelect.addEventListener('change', syncFreshUI);
+syncFreshUI();
+
+document.getElementById('resetFreshBtn').onclick = async () => {
+  const agent = document.getElementById('agentSelect').value;
+  const data = await api('/api/reset_fresh', {agent});
+  if (data.error) { statusEl.textContent = data.error; return; }
+  statusEl.textContent = 'Fresh agent reset to blank. Press New Game to start training it.';
+  statesEl.textContent = '';
+};
+
+function renderBoard() {
+  boardEl.innerHTML = '';
+  board.forEach((v, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'cell' + (v === 'X' ? ' x' : v === 'O' ? ' o' : '');
+    btn.textContent = v;
+    btn.disabled = gameOver || v !== '';
+    btn.onclick = () => playCell(i);
+    boardEl.appendChild(btn);
+  });
+}
+
+function renderTally(t) {
+  tallyEl.textContent = `You: ${t.you}   Draws: ${t.draw}   Agent: ${t.agent}`;
+}
+
+function renderStates(n) {
+  if (n === undefined) return;
+  statesEl.textContent = `States learned: ${n}${isFresh() ? ' (of ~4,500 possible)' : ''}`;
+}
+
+function describeWinner(w) {
+  if (w === 'you') return 'You win!';
+  if (w === 'agent') return 'Agent wins!';
+  if (w === 'draw') return 'Draw.';
+  return '';
+}
+
+async function newGame() {
+  const agent = document.getElementById('agentSelect').value;
+  const learn = document.getElementById('learnCheck').checked;
+  const human_first = document.getElementById('firstSelect').value === 'human';
+  const fresh = isFresh();
+  const epsilon = parseFloat(epsilonInput.value);
+  const data = await api('/api/new_game', {agent, learn, human_first, fresh, epsilon});
+  if (data.error) { statusEl.textContent = data.error; return; }
+  board = data.board;
+  gameOver = data.done;
+  renderTally(data.tally);
+  renderStates(data.states_learned);
+  if (gameOver) {
+    statusEl.textContent = describeWinner(data.winner);
+  } else if (data.agent_move !== null) {
+    statusEl.textContent = `Agent played ${data.agent_move}. Your turn (${data.human_symbol}).`;
+  } else {
+    statusEl.textContent = `Your turn (${data.human_symbol}).`;
+  }
+  renderBoard();
+}
+
+async function playCell(i) {
+  if (gameOver || board[i] !== '') return;
+  const data = await api('/api/move', {cell: i});
+  if (data.error) {
+    statusEl.textContent = data.error;
+    if (data.error.includes('New Game')) { gameOver = true; renderBoard(); }
+    return;
+  }
+  board = data.board;
+  gameOver = data.done;
+  renderTally(data.tally);
+  renderStates(data.states_learned);
+  if (gameOver) {
+    statusEl.textContent = describeWinner(data.winner);
+  } else if (data.agent_move !== null) {
+    statusEl.textContent = `Agent played ${data.agent_move}. Your turn.`;
+  } else {
+    statusEl.textContent = 'Your turn.';
+  }
+  renderBoard();
+}
+
+document.getElementById('newGameBtn').onclick = newGame;
+renderBoard();
+</script>
+</body>
+</html>

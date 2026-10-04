@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Secrets / local config
+.env
+.env.*
+
+# Logs and OS/editor junk
+*.log
+.DS_Store
+.vscode/
+.idea/
+
+# Note: saved_models/*.pkl and plots/*.png ARE committed on purpose: the web app
+# serves the pretrained models, and the README shows the training plot.
