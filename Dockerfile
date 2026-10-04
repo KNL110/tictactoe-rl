@@ -1,5 +1,4 @@
-# Image for the Hugging Face Space (Docker SDK). HF runs containers as uid 1000
-# and routes traffic to app_port (7860, set in README.md's front matter).
+# Production image. Listens on $PORT (set by hosts like Render), defaulting to 7860.
 FROM python:3.13-slim
 
 RUN useradd -m -u 1000 user
@@ -17,4 +16,4 @@ COPY --chown=user saved_models ./saved_models
 
 EXPOSE 7860
 # One worker on purpose: games live in process memory. Threads handle concurrent visitors.
-CMD ["gunicorn", "--workers", "1", "--threads", "8", "--bind", "0.0.0.0:7860", "webapp.app:app"]
+CMD exec gunicorn --workers 1 --threads 8 --bind "0.0.0.0:${PORT:-7860}" webapp.app:app
